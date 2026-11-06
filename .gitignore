@@ -1,0 +1,33 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Account-specific resource IDs created by the setup scripts
+.coordinator_id
+.environment_id
+.specialist_ids.json
+.skill_ids.json
+.last_session_id
+
+# Run output (generated proposals, transcripts, logs may contain deal data)
+outputs/
+outputs-*/
+*.log
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor / OS / tooling
+.claude/
+.idea/
+.vscode/
+.DS_Store
