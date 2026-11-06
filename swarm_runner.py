@@ -21,22 +21,17 @@ import time
 from pathlib import Path
 from typing import Callable
 
+from deal_inputs import (
+    build_user_message,
+    is_input_file,
+    mounted_file_ids,
+    upload_inputs,
+)
+
 ROOT = Path(__file__).parent
-SUPPORTING_FILES = [
-    ROOT / "synthetic-data" / "past-wins.json",
-    ROOT / "synthetic-data" / "product-overview.md",
-]
 BETA = "managed-agents-2026-04-01"
 
 Emit = Callable[[dict], None]
-
-
-def build_context(rfp_path: Path) -> str:
-    blocks = []
-    for path in [rfp_path, *SUPPORTING_FILES]:
-        if path.exists():
-            blocks.append(f"=====  DOCUMENT: {path.name}  =====\n{path.read_text()}")
-    return "\n\n".join(blocks)
 
 
 def _text_of(content) -> str:
@@ -61,26 +56,18 @@ def run_swarm(rfp_path: Path, out_dir: Path, emit: Emit) -> None:
         )
     client = Anthropic()
 
-    emit({"type": "status", "msg": f"Reading {rfp_path.name}"})
+    emit({"type": "status", "msg": f"Uploading {rfp_path.name}"})
+    resources = upload_inputs(client, rfp_path, log=lambda _msg: None)
     session = client.beta.sessions.create(
         agent=coord_file.read_text().strip(),
         environment_id=env_file.read_text().strip(),
         title=f"Deal Desk (web) - {rfp_path.stem}",
+        resources=resources,
     )
+    session_file_ids = mounted_file_ids(session)
     (ROOT / ".last_session_id").write_text(session.id)
 
-    user_message = (
-        "An RFP has just landed. Please run the standard Deal Desk process:\n"
-        "1. Read the RFP yourself.\n"
-        "2. Delegate to all four specialists in parallel.\n"
-        "3. Synthesise their replies.\n"
-        "4. Produce the final proposal response as a branded Word document "
-        "if you have access to a docx skill; otherwise output the response "
-        "as a structured markdown document.\n\n"
-        "Specialists have their own skills attached for their respective "
-        "domains. Move fast, the RFP deadline is real.\n\n"
-        f"{build_context(rfp_path)}"
-    )
+    user_message = build_user_message(rfp_path)
 
     with client.beta.sessions.events.stream(session.id) as stream:
         client.beta.sessions.events.send(
@@ -110,6 +97,8 @@ def run_swarm(rfp_path: Path, out_dir: Path, emit: Emit) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = []
     for f in client.beta.files.list(scope_id=session.id, betas=[BETA]).data:
+        if is_input_file(f, session_file_ids, rfp_path):
+            continue  # our own inputs, mounted at session creation
         dest = out_dir / f.filename
         client.beta.files.download(f.id).write_to_file(str(dest))
         saved.append({"name": f.filename, "path": str(dest)})

@@ -33,7 +33,7 @@ Three cards in [`scenario-cards.md`](./scenario-cards.md). Each gives you a coor
 
 3. **Create the environment.** Run `python setup_environment.py`. This provisions the cloud container the session runs in and saves its ID to `.environment_id`.
 
-4. **Create the coordinator.** Run `python create_coordinator.py`. This creates the coordinator agent with `multiagent: coordinator` config, listing the specialists in its callable roster, plus the pre-built `docx` skill. Run it **after** step 2: the roster pins each specialist's version at creation time, so a coordinator created earlier calls the specialists without their skills. Re-running it updates the existing coordinator rather than creating a new one.
+4. **Create the coordinator.** Run `python create_coordinator.py`. This creates the coordinator agent with `multiagent: coordinator` config, listing the specialists in its callable roster, plus the pre-built `docx` skill and the `bts-branding` skill uploaded in step 2. Run it **after** step 2: the roster pins each specialist's version at creation time, so a coordinator created earlier calls the specialists without their skills. Re-running it updates the existing coordinator rather than creating a new one, and keeps any skills already attached to it.
 
 5. **Run the deal.** Run `python run_deal_desk.py`. This:
    - Uploads the synthetic RFP (`synthetic-data/rfp-acme-corp.md`) as a file

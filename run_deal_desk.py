@@ -19,42 +19,16 @@ from pathlib import Path
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
+from deal_inputs import (
+    build_user_message,
+    is_input_file,
+    mounted_file_ids,
+    upload_inputs,
+)
+
 
 RFP_PATH = Path("synthetic-data/rfp-acme-corp.md")
-SUPPORTING_FILES = [
-    Path("synthetic-data/past-wins.json"),
-    Path("synthetic-data/product-overview.md"),
-]
-INPUT_FILES = [RFP_PATH, *SUPPORTING_FILES]
 OUTPUT_DIR = Path("outputs")
-
-# A file mounted with mount_path "/name.ext" appears here inside the container.
-UPLOADS_DIR = "/mnt/session/uploads"
-# Originals only need to outlive session creation; the session keeps its own copy.
-UPLOAD_TTL_SECONDS = 86_400
-
-
-def container_path(path: Path) -> str:
-    return f"{UPLOADS_DIR}/{path.name}"
-
-
-def upload_inputs(client: Anthropic) -> list[dict]:
-    """Upload each input file and return session `resources` that mount it."""
-    missing = [str(p) for p in INPUT_FILES if not p.exists()]
-    if missing:
-        raise SystemExit(f"Missing input file(s): {', '.join(missing)}")
-
-    resources = []
-    for path in INPUT_FILES:
-        uploaded = client.files.upload(
-            file=(path.name, path.read_bytes(), "text/plain"),
-            expires_in_seconds=UPLOAD_TTL_SECONDS,
-        )
-        print(f"  uploaded {path.name:24s} -> {uploaded.id}")
-        resources.append(
-            {"type": "file", "file_id": uploaded.id, "mount_path": f"/{path.name}"}
-        )
-    return resources
 
 
 def main() -> None:
@@ -74,7 +48,10 @@ def main() -> None:
     client = Anthropic()
 
     print("Uploading RFP + supporting docs...")
-    resources = upload_inputs(client)
+    try:
+        resources = upload_inputs(client, RFP_PATH)
+    except FileNotFoundError as exc:
+        raise SystemExit(str(exc))
 
     print(f"\nStarting session against coordinator {coordinator_id}...")
     session = client.beta.sessions.create(
@@ -85,29 +62,12 @@ def main() -> None:
     )
     Path(".last_session_id").write_text(session.id)
 
-    mounted_file_ids = set()
+    session_file_ids = mounted_file_ids(session)
     for r in session.resources or []:
         if getattr(r, "type", None) == "file":
-            mounted_file_ids.add(r.file_id)
             print(f"  mounted {r.mount_path:24s} ({r.file_id})")
 
-    user_message = (
-        "An RFP has just landed. The inputs are already on the shared disk, "
-        "mounted read-only:\n"
-        f"- RFP: {container_path(RFP_PATH)}\n"
-        f"- Comparable past deals: {container_path(SUPPORTING_FILES[0])}\n"
-        f"- Product capability map: {container_path(SUPPORTING_FILES[1])}\n\n"
-        "Please run the standard Deal Desk process:\n"
-        "1. Read the RFP at the path above.\n"
-        "2. Delegate to all four specialists in one turn, following the "
-        "delegation contract: pass file paths, not file contents.\n"
-        "3. Synthesise from the specialists' report files.\n"
-        "4. Produce the final proposal response as a branded Word document "
-        "if you have access to a docx skill; otherwise output the response "
-        "as a structured markdown document.\n\n"
-        "Specialists have their own skills attached for their respective "
-        "domains. Move fast — the RFP deadline is real."
-    )
+    user_message = build_user_message(RFP_PATH)
 
     # Stream the events — this is the demo. Watch for parallel thread spawns.
     print("\n=== EVENT STREAM (this is the demo) ===\n")
@@ -156,10 +116,9 @@ def main() -> None:
         scope_id=session.id,
         betas=["managed-agents-2026-04-01"],
     )
-    input_names = {p.name for p in INPUT_FILES}
     file_count = 0
     for f in files.data:
-        if f.id in mounted_file_ids or f.filename in input_names:
+        if is_input_file(f, session_file_ids, RFP_PATH):
             continue  # our own inputs, mounted at session creation
         # Skip Office lock/temp files (e.g. "~$proposal.docx") that can leak
         # into the container's outputs dir when a doc is opened for validation.

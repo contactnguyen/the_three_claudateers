@@ -108,6 +108,21 @@ fast because the RFP deadline is real.
 """
 
 
+def coordinator_skills(existing) -> list[dict]:
+    """The coordinator's skills: whatever it already has, plus the pre-built
+    docx skill (to write the deliverable) and bts-branding if upload_skills.py
+    has uploaded it. Never drops a skill that is already attached."""
+    skills = [s.model_dump(exclude_none=True) for s in (existing or [])]
+    have = {s["skill_id"] for s in skills}
+    wanted = [{"type": "anthropic", "skill_id": "docx"}]
+    skill_ids_path = Path(".skill_ids.json")
+    if skill_ids_path.exists():
+        branding = json.loads(skill_ids_path.read_text()).get("bts-branding")
+        if branding:
+            wanted.append({"type": "custom", "skill_id": branding, "version": "latest"})
+    return skills + [s for s in wanted if s["skill_id"] not in have]
+
+
 def main() -> None:
     load_dotenv()  # reads ANTHROPIC_API_KEY from .env when it isn't exported
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -129,8 +144,6 @@ def main() -> None:
         model="claude-opus-4-7",  # Coordinator deserves the most capable model
         system=COORDINATOR_SYSTEM,
         tools=[{"type": "agent_toolset_20260401"}],
-        # Pre-built Anthropic skill so the coordinator can write the .docx deliverable
-        skills=[{"type": "anthropic", "skill_id": "docx"}],
         multiagent={
             "type": "coordinator",
             # No version given, so each specialist resolves to its latest version
@@ -154,11 +167,14 @@ def main() -> None:
     if coordinator_path.exists():
         coordinator_id = coordinator_path.read_text().strip()
         current = client.beta.agents.retrieve(coordinator_id)
+        # Keep skills attached since (e.g. bts-branding via upload_skills.py)
+        params["skills"] = coordinator_skills(current.skills)
         coordinator = client.beta.agents.update(
             coordinator_id, version=current.version, **params
         )
         print(f"Coordinator updated: {coordinator.id} (v{coordinator.version})")
     else:
+        params["skills"] = coordinator_skills([])
         coordinator = client.beta.agents.create(**params)
         coordinator_path.write_text(coordinator.id)
         print(f"Coordinator created: {coordinator.id}")
