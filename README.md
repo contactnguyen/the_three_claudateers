@@ -89,7 +89,8 @@ Narrate the events stream while it runs. The room will get it.
 ├── skills/                        (custom skills, one per specialist)
 │   ├── pricing-playbook/SKILL.md
 │   ├── legal-checklist/SKILL.md
-│   └── competitive-intel/SKILL.md
+│   ├── competitive-intel/SKILL.md
+│   └── technical-fit/SKILL.md
 └── synthetic-data/
     ├── rfp-acme-corp.md           (the RFP that triggers the swarm)
     ├── past-wins.json             (used by pricing specialist)
