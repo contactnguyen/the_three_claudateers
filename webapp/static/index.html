@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BTS-Synthetic | Deal Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Poppins:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="page">
+    <header class="cover">
+      <p class="eyebrow">BTS-SYNTHETIC</p>
+      <h1 class="title">Deal Desk</h1>
+      <p class="subtitle">Proposal Response Generator <span id="demo-flag" hidden>(demo mode, scripted run)</span></p>
+      <hr class="rule">
+    </header>
+
+    <section class="controls" aria-label="Start a run">
+      <label for="rfp">RFP</label>
+      <select id="rfp"></select>
+      <button id="generate" class="primary" type="button">Generate response</button>
+      <span id="elapsed" class="caption" aria-live="off"></span>
+    </section>
+
+    <section class="stage" id="stage">
+      <div class="gbc" aria-label="Game: the senior partner briefs the specialists">
+        <div class="gbc-top"><span>DEAL DESK</span><span class="gbc-color">COLOR</span></div>
+        <div class="bezel">
+          <div class="bezel-meta"><i class="led" id="led"></i><span>BATTERY</span></div>
+          <canvas id="screen" width="160" height="144" role="img"
+                  aria-label="Pixel art animation of the orchestrator walking between the four specialists while the proposal is generated"></canvas>
+        </div>
+        <div class="gbc-brand">BTS-SYNTHETIC</div>
+        <div class="controls-hw">
+          <div class="dpad" aria-hidden="true"><span class="u"></span><span class="d"></span><span class="l"></span><span class="r"></span></div>
+          <div class="ab">
+            <button type="button" class="btn-b" id="btn-b" aria-label="B">B</button>
+            <button type="button" class="btn-a" id="btn-a" aria-label="A: skip dialogue">A</button>
+          </div>
+        </div>
+        <div class="startsel">
+          <button type="button" class="pill" id="btn-select" aria-label="Select">SELECT</button>
+          <button type="button" class="pill" id="btn-start" aria-label="Start: generate response">START</button>
+        </div>
+      </div>
+
+      <aside class="log" aria-label="Quest log">
+        <h2>Team status</h2>
+        <ul class="team" id="team"></ul>
+        <h2>Quest log</h2>
+        <ol id="log" class="loglist" aria-live="polite"></ol>
+        <p class="caption">Press A on the console to skip dialogue.</p>
+      </aside>
+    </section>
+
+    <p id="error" class="error" role="alert" hidden></p>
+
+    <section id="result" class="result" hidden>
+      <h2 class="h1">Proposal response</h2>
+      <div class="toolbar">
+        <div class="tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-tab="doc">Full response</button>
+          <button role="tab" aria-selected="false" data-tab="spec">Specialist briefings</button>
+        </div>
+        <span id="downloads"></span>
+      </div>
+      <nav id="toc" class="toc" aria-label="Jump to section"></nav>
+      <article id="tab-doc" class="paper"></article>
+      <div id="tab-spec" class="specs" hidden></div>
+    </section>
+
+    <footer class="footer"><span>BTS-Synthetic | Confidential</span></footer>
+  </main>
+  <script src="/static/game.js"></script>
+</body>
+</html>
