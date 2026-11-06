@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 
 from anthropic import Anthropic
+from dotenv import load_dotenv
 
 
 COORDINATOR_SYSTEM = """\
@@ -33,16 +34,40 @@ You can call these specialists:
 
 # How to run a deal
 
-1. Read the RFP yourself first. Note the customer, scope, and any obvious
-   curveballs.
+1. Read the RFP yourself first, at the path given in the run message. Note
+   the customer, scope, and any obvious curveballs.
 
-2. Delegate to ALL FOUR specialists in parallel. Each gets:
-   - The full RFP text
-   - A clear, narrow brief stating what you need from them
-   - A deadline ("answer in one message, ~300 words")
+   The deal inputs are mounted read-only under /mnt/session/uploads/ before
+   you start: the RFP, past-wins.json (comparable deals) and
+   product-overview.md (our capability map). Never copy, retype or rewrite
+   them anywhere else.
 
-3. Synthesise their outputs into a single proposal response. The response
-   should cover:
+2. Delegate to ALL FOUR specialists in ONE turn, so they run in parallel.
+   Specialists cannot see this conversation. They see only the brief you
+   send them and the shared disk. So every brief must be self-contained and
+   follow this contract:
+
+   - Inputs: the absolute /mnt/session/uploads/ paths the specialist should
+     read, stated as read-only. Pass paths, never pasted file contents.
+       Pricing Specialist:        RFP + past-wins.json
+       Legal Reviewer:            RFP
+       Technical Fit Specialist:  RFP + product-overview.md
+       Competitive Intel Analyst: RFP + past-wins.json (primary_competitors)
+   - Questions: a short list of narrow questions, tied to RFP sections.
+   - Output file: write the full report (max ~600 words) to exactly
+       Pricing Specialist:        /mnt/deal-desk/reports/pricing.md
+       Legal Reviewer:            /mnt/deal-desk/reports/legal.md
+       Technical Fit Specialist:  /mnt/deal-desk/reports/technical-fit.md
+       Competitive Intel Analyst: /mnt/deal-desk/reports/competitive.md
+     Never write under /mnt/session/uploads/.
+   - Reply format: at most 5 summary bullets, then the output file path.
+
+3. Synthesise from the report files. Read all four files under
+   /mnt/deal-desk/reports/ before you write anything; the chat replies are
+   summaries only. When specialists disagree, the topic owner wins:
+   Pricing on price and discount, Legal on contract terms, Technical Fit on
+   capability claims. Note any conflict you resolved this way under Risks.
+   The response should cover:
    - Executive summary (3 bullets)
    - Our understanding of the customer's need
    - Why we're the right fit (drawing on Technical Fit + Competitive Intel)
@@ -56,13 +81,25 @@ You can call these specialists:
 
 # How to talk to specialists
 
-When delegating, be direct: "Pricing Specialist: for this RFP, recommend
-terms. Include discount band and red-line concessions. Cite past-wins.json
-where relevant."
+When delegating, be direct and follow the contract. For example:
 
-When you receive a specialist's reply, accept it. Don't second-guess. If
-you genuinely disagree, send the specialist a follow-up — but only if it
-matters.
+  "Pricing Specialist. You can't see my conversation; everything you need
+  is below or on disk.
+  Inputs (read-only, do not modify):
+    /mnt/session/uploads/rfp-acme-corp.md
+    /mnt/session/uploads/past-wins.json
+  Questions (RFP section 3, Commercial requirements):
+    1. Opening discount band and walk-away floor?
+    2. Term and payment structure?
+    3. Which requested concessions do we accept, which do we refuse?
+  Output: write your full report (max ~600 words) to
+    /mnt/deal-desk/reports/pricing.md
+  Reply: at most 5 summary bullets, then the output file path."
+
+When you receive a specialist's reply, read its report file. Don't
+second-guess a specialist inside its own domain; apply the topic-owner rule
+above when two disagree. Send a follow-up only if a report is missing,
+incomplete, or genuinely wrong, and only if it matters.
 
 # Tone
 
@@ -71,7 +108,23 @@ fast because the RFP deadline is real.
 """
 
 
+def coordinator_skills(existing) -> list[dict]:
+    """The coordinator's skills: whatever it already has, plus the pre-built
+    docx skill (to write the deliverable) and bts-branding if upload_skills.py
+    has uploaded it. Never drops a skill that is already attached."""
+    skills = [s.model_dump(exclude_none=True) for s in (existing or [])]
+    have = {s["skill_id"] for s in skills}
+    wanted = [{"type": "anthropic", "skill_id": "docx"}]
+    skill_ids_path = Path(".skill_ids.json")
+    if skill_ids_path.exists():
+        branding = json.loads(skill_ids_path.read_text()).get("bts-branding")
+        if branding:
+            wanted.append({"type": "custom", "skill_id": branding, "version": "latest"})
+    return skills + [s for s in wanted if s["skill_id"] not in have]
+
+
 def main() -> None:
+    load_dotenv()  # reads ANTHROPIC_API_KEY from .env when it isn't exported
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise SystemExit("Set ANTHROPIC_API_KEY before running.")
@@ -86,13 +139,16 @@ def main() -> None:
         default_headers={"anthropic-beta": "managed-agents-2026-04-01"},
     )
 
-    coordinator = client.beta.agents.create(
+    params = dict(
         name="Deal Desk Senior Partner",
         model="claude-opus-4-7",  # Coordinator deserves the most capable model
         system=COORDINATOR_SYSTEM,
         tools=[{"type": "agent_toolset_20260401"}],
         multiagent={
             "type": "coordinator",
+            # No version given, so each specialist resolves to its latest version
+            # at create/update time and stays pinned to it. Run this AFTER
+            # upload_skills.py, or the roster points at skill-less versions.
             "agents": [
                 {"type": "agent", "id": agent_id}
                 for agent_id in specialist_ids.values()
@@ -105,10 +161,29 @@ def main() -> None:
         },
     )
 
-    Path(".coordinator_id").write_text(coordinator.id)
-    print(f"Coordinator created: {coordinator.id}")
-    print(f"Roster: {list(specialist_ids.keys())}")
-    print(f"\nNext: python upload_skills.py then python run_deal_desk.py")
+    # Safe to re-run: update the existing coordinator (re-pinning the roster to
+    # the specialists' latest versions) instead of creating a duplicate.
+    coordinator_path = Path(".coordinator_id")
+    if coordinator_path.exists():
+        coordinator_id = coordinator_path.read_text().strip()
+        current = client.beta.agents.retrieve(coordinator_id)
+        # Keep skills attached since (e.g. bts-branding via upload_skills.py)
+        params["skills"] = coordinator_skills(current.skills)
+        coordinator = client.beta.agents.update(
+            coordinator_id, version=current.version, **params
+        )
+        print(f"Coordinator updated: {coordinator.id} (v{coordinator.version})")
+    else:
+        params["skills"] = coordinator_skills([])
+        coordinator = client.beta.agents.create(**params)
+        coordinator_path.write_text(coordinator.id)
+        print(f"Coordinator created: {coordinator.id}")
+
+    names = {v: k for k, v in specialist_ids.items()}
+    for ref in getattr(coordinator.multiagent, "agents", []):
+        print(f"  roster: {names.get(ref.id, ref.id):14s} {ref.id} v{ref.version}")
+    print(f"  skills: {[s.skill_id for s in coordinator.skills]}")
+    print(f"\nNext: python run_deal_desk.py")
 
 
 if __name__ == "__main__":

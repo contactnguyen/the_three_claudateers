@@ -1,9 +1,11 @@
 """
 Run the Deal Desk swarm against the synthetic RFP.
 
-Inlines the RFP + past-wins + product-overview into the user message (simpler
-than Files API for hackathon-scale content). Streams events as they come in so
-you can watch the parallel thread fan-out — this is the demo, narrate it live.
+Uploads the RFP + past-wins + product-overview with the Files API and mounts
+them read-only into the session at /mnt/session/uploads/. Every agent thread
+shares that disk, so the coordinator hands specialists file paths instead of
+pasted text. Streams events as they come in so you can watch the parallel
+thread fan-out — this is the demo, narrate it live.
 
 Saves the final transcript to outputs/.
 
@@ -15,28 +17,22 @@ import os
 from pathlib import Path
 
 from anthropic import Anthropic
+from dotenv import load_dotenv
+
+from deal_inputs import (
+    build_user_message,
+    is_input_file,
+    mounted_file_ids,
+    upload_inputs,
+)
 
 
 RFP_PATH = Path("synthetic-data/rfp-acme-corp.md")
-SUPPORTING_FILES = [
-    Path("synthetic-data/past-wins.json"),
-    Path("synthetic-data/product-overview.md"),
-]
 OUTPUT_DIR = Path("outputs")
 
 
-def load_inputs_as_context() -> str:
-    blocks = []
-    for path in [RFP_PATH, *SUPPORTING_FILES]:
-        if not path.exists():
-            print(f"  WARNING: {path} missing — skipping")
-            continue
-        print(f"  including {path.name}")
-        blocks.append(f"=====  DOCUMENT: {path.name}  =====\n{path.read_text()}")
-    return "\n\n".join(blocks)
-
-
 def main() -> None:
+    load_dotenv()  # reads ANTHROPIC_API_KEY from .env when it isn't exported
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise SystemExit("Set ANTHROPIC_API_KEY before running.")
 
@@ -51,29 +47,27 @@ def main() -> None:
 
     client = Anthropic()
 
-    print("Loading RFP + supporting docs...")
-    context = load_inputs_as_context()
+    print("Uploading RFP + supporting docs...")
+    try:
+        resources = upload_inputs(client, RFP_PATH)
+    except FileNotFoundError as exc:
+        raise SystemExit(str(exc))
 
     print(f"\nStarting session against coordinator {coordinator_id}...")
     session = client.beta.sessions.create(
         agent=coordinator_id,
         environment_id=environment_id,
         title="Deal Desk — Acme Corp RFP",
+        resources=resources,
     )
     Path(".last_session_id").write_text(session.id)
 
-    user_message = (
-        "An RFP has just landed. Please run the standard Deal Desk process:\n"
-        "1. Read the RFP yourself.\n"
-        "2. Delegate to all four specialists in parallel.\n"
-        "3. Synthesise their replies.\n"
-        "4. Produce the final proposal response as a branded Word document "
-        "if you have access to a docx skill; otherwise output the response "
-        "as a structured markdown document.\n\n"
-        "Specialists have their own skills attached for their respective "
-        "domains. Move fast — the RFP deadline is real.\n\n"
-        f"{context}"
-    )
+    session_file_ids = mounted_file_ids(session)
+    for r in session.resources or []:
+        if getattr(r, "type", None) == "file":
+            print(f"  mounted {r.mount_path:24s} ({r.file_id})")
+
+    user_message = build_user_message(RFP_PATH)
 
     # Stream the events — this is the demo. Watch for parallel thread spawns.
     print("\n=== EVENT STREAM (this is the demo) ===\n")
@@ -124,6 +118,8 @@ def main() -> None:
     )
     file_count = 0
     for f in files.data:
+        if is_input_file(f, session_file_ids, RFP_PATH):
+            continue  # our own inputs, mounted at session creation
         # Skip Office lock/temp files (e.g. "~$proposal.docx") that can leak
         # into the container's outputs dir when a doc is opened for validation.
         if f.filename.startswith("~$") or f.filename.startswith("."):
