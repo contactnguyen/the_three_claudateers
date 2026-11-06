@@ -58,6 +58,26 @@ collects their replies, driven by the real event stream. When it finishes, the f
 response is rendered on the page (with section links), plus the specialist briefings and a
 .docx download. Styling follows `skills/bts-branding/SKILL.md`.
 
+### Voice agent ("Ask the proposal")
+
+Once the Word document is produced, an **Ask the proposal** panel appears above it. Press
+*Start conversation* and talk: the agent has read the whole document, answers from it, and
+replies in whatever language you speak. It runs on the same voice stack as
+voice.oracle-aicoe.com/sky: OCI Generative AI's realtime endpoint (`openai.gpt-realtime`,
+voice `marin`). The browser streams mic audio to `/api/voice/<job>` and the Flask app relays
+it to OCI (`webapp/voice.py`), so the key stays on the server. It needs these in `.env`:
+
+```bash
+OCI_REALTIME_API_KEY=sk-...
+OCI_REALTIME_MODEL=openai.gpt-realtime
+OCI_REALTIME_WS_URL=wss://inference.generativeai.us-ashburn-1.oci.oraclecloud.com/openai/v1/realtime
+REALTIME_VOICE=marin
+INPUT_TRANSCRIBER=gpt-4o-transcribe
+NOISE_REDUCTION=near_field
+```
+
+The socket refuses to open until the job has a finished .docx. Sessions are capped at 15 minutes.
+
 ## Stretch goals (20 min)
 
 See [`stretch-goals.md`](./stretch-goals.md). The big ones:

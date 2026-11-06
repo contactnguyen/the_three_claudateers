@@ -19,14 +19,17 @@ from pathlib import Path
 import mammoth
 from dotenv import load_dotenv
 from flask import Flask, Response, abort, jsonify, request, send_file, send_from_directory
+from flask_sock import Sock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import swarm_runner  # noqa: E402
+import voice  # noqa: E402  (webapp/voice.py, importable because the script's dir is on sys.path)
 
 load_dotenv(ROOT / ".env")
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
+sock = Sock(app)
 OUT_ROOT = ROOT / "outputs" / "web"
 RFP_DIR = ROOT / "synthetic-data"
 DEMO = False
@@ -68,6 +71,20 @@ class Job:
 JOBS: dict[str, Job] = {}
 
 
+def job_document(job_id: str) -> tuple[str, str] | None:
+    """(name, path) of the finished job's Word document, or None while there is none."""
+    job = JOBS.get(job_id)
+    if job is None or not job.finished:
+        return None
+    docx = next((f for f in job.files if f["name"].lower().endswith(".docx")), None)
+    if docx is None or not Path(docx["path"]).is_file():
+        return None
+    return docx["name"], docx["path"]
+
+
+voice.register(app, sock, job_document)
+
+
 def rfp_files() -> list[Path]:
     return sorted(RFP_DIR.glob("rfp-*.md"))
 
@@ -81,6 +98,7 @@ def index():
 def config():
     return jsonify({
         "demo": DEMO,
+        "voice": voice.voice_available(),
         "rfps": [{"id": p.name, "label": p.stem.removeprefix("rfp-").replace("-", " ").title()}
                  for p in rfp_files()],
     })

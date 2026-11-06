@@ -2,3 +2,5 @@ anthropic>=2.6.0
 python-dotenv>=1.0.0
 flask>=3.0
 mammoth>=1.8
+websockets>=13
+flask-sock>=0.7
