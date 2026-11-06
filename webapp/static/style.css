@@ -122,6 +122,40 @@ button.primary:disabled { background: var(--lgray); color: var(--mid); border-co
 .paper tr:nth-child(even):not(:first-child) td { background: var(--lgray); }
 .paper img { max-width: 100%; height: auto; display: block; margin: 16px auto; }
 
+/* voice agent: flat card, one orange accent, state shown by the orb */
+.voice { border: 1px solid var(--dark); background: var(--light); padding: 20px 24px; margin-bottom: 24px; }
+.voice-head { display: grid; grid-template-columns: auto 1fr auto; gap: 20px; align-items: center; }
+@media (max-width: 720px) { .voice-head { grid-template-columns: auto 1fr; } .voice-actions { grid-column: 1 / -1; } }
+.voice-copy h3 { font: 700 14pt var(--head); margin: 0 0 4px; }
+.voice-copy p { margin: 0 0 4px; }
+.voice-copy .caption { margin: 0; }
+#voice-state { font: 700 9pt var(--head); font-style: normal; color: var(--dark); letter-spacing: .04em; text-transform: uppercase; }
+.voice-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+button.secondary {
+  background: var(--light); color: var(--dark); border: 1px solid var(--dark);
+  font-weight: 700; font-size: 10pt; padding: 10px 18px;
+}
+button.secondary:hover { border-color: var(--orange); color: var(--orange); }
+button.secondary[aria-pressed="true"] { background: var(--lgray); }
+.voice-orb { width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--dark); display: grid; place-items: center; background: var(--lgray); }
+.voice-orb i { width: 18px; height: 18px; border-radius: 50%; background: var(--mid); transition: transform .2s, background .2s; }
+.voice[data-state="connecting"] .voice-orb i { background: var(--mid); animation: vpulse 1s ease-in-out infinite; }
+.voice[data-state="listening"] .voice-orb i { background: var(--green); }
+.voice[data-state="hearing"] .voice-orb i { background: var(--green); transform: scale(1.5); }
+.voice[data-state="thinking"] .voice-orb i { background: var(--blue); animation: vpulse .8s ease-in-out infinite; }
+.voice[data-state="speaking"] .voice-orb i { background: var(--orange); animation: vtalk .35s ease-in-out infinite alternate; }
+.voice[data-state="muted"] .voice-orb i { background: var(--dark); }
+@keyframes vpulse { 50% { transform: scale(1.4); opacity: .6; } }
+@keyframes vtalk { from { transform: scale(1); } to { transform: scale(1.8); } }
+@media (prefers-reduced-motion: reduce) { .voice-orb i { animation: none !important; } }
+.voice .error { margin: 14px 0 0; }
+.voice-log { list-style: none; padding: 0; margin: 14px 0 0; max-height: 260px; overflow: auto; font-size: 10.5pt; }
+.voice-log:empty { display: none; }
+.voice-log li { display: grid; grid-template-columns: 90px 1fr; gap: 10px; padding: 6px 0; border-top: 1px solid var(--lgray); }
+.voice-log b { font: 700 9pt var(--head); padding-top: 2px; }
+.voice-log li.agent b { color: var(--orange); }
+.voice-log li.you b { color: var(--mid); }
+
 .specs { display: grid; gap: 16px; }
 .spec { background: var(--lgray); border-left: 4px solid var(--orange); padding: 16px 20px; }
 .spec h3 { font: 700 12pt var(--head); margin: 0 0 6px; }

@@ -133,7 +133,7 @@ def run_demo(out_dir: Path, emit: Emit, speed: float = 1.0) -> None:
         time.sleep(delay / speed)
         emit(dict(ev))
     out_dir.mkdir(parents=True, exist_ok=True)
-    sample = next(iter(sorted(ROOT.glob("outputs-run2-branded/*.docx"))), None)
+    sample = next(iter(sorted(ROOT.glob("outputs-run2-branded/*.docx")) or sorted(ROOT.glob("outputs/*.docx"))), None)
     files = []
     if sample:
         dest = out_dir / sample.name

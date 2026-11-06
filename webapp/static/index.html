@@ -60,6 +60,24 @@
 
     <section id="result" class="result" hidden>
       <h2 class="h1">Proposal response</h2>
+
+      <section id="voice" class="voice" data-state="idle" aria-label="Voice agent" hidden>
+        <div class="voice-head">
+          <div class="voice-orb" aria-hidden="true"><i></i></div>
+          <div class="voice-copy">
+            <h3>Ask the proposal</h3>
+            <p>Talk to a voice agent that has read <strong id="voice-doc"></strong>. Ask in any language.</p>
+            <p class="caption"><span id="voice-state" aria-live="polite">Ready</span> <span id="voice-meta"></span></p>
+          </div>
+          <div class="voice-actions">
+            <button id="voice-start" class="primary" type="button">Start conversation</button>
+            <button id="voice-mute" class="secondary" type="button" aria-pressed="false" hidden>Mute</button>
+            <button id="voice-stop" class="secondary" type="button" hidden>End</button>
+          </div>
+        </div>
+        <p id="voice-error" class="error" role="alert" hidden></p>
+        <ol id="voice-log" class="voice-log" aria-live="polite"></ol>
+      </section>
       <div class="toolbar">
         <div class="tabs" role="tablist">
           <button role="tab" aria-selected="true" data-tab="doc">Full response</button>
@@ -75,5 +93,6 @@
     <footer class="footer"><span>BTS-Synthetic | Confidential</span></footer>
   </main>
   <script src="/static/game.js"></script>
+  <script src="/static/voice.js"></script>
 </body>
 </html>

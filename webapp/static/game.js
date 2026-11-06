@@ -390,6 +390,7 @@
   async function generate() {
     if (es) es.close();
     $("#error").hidden = true; $("#result").hidden = true; $("#log").innerHTML = "";
+    document.dispatchEvent(new CustomEvent("dealdesk:reset"));
     renderTeam();
     $("#generate").disabled = true;
     t0 = Date.now();
@@ -447,6 +448,8 @@
     });
     $("#result").hidden = false;
     $("#result").scrollIntoView({ behavior: "smooth" });
+    // The voice agent (voice.js) only wakes up once there is a document to talk about.
+    document.dispatchEvent(new CustomEvent("dealdesk:result", { detail: { jobId, hasDocument: !!r.html } }));
   }
 
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
