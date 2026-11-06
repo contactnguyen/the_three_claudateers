@@ -124,6 +124,11 @@ def main() -> None:
     )
     file_count = 0
     for f in files.data:
+        # Skip Office lock/temp files (e.g. "~$proposal.docx") that can leak
+        # into the container's outputs dir when a doc is opened for validation.
+        if f.filename.startswith("~$") or f.filename.startswith("."):
+            print(f"  skipping lock/temp file: {f.filename}")
+            continue
         out_path = OUTPUT_DIR / f.filename
         print(f"  {f.filename}  ->  {out_path}")
         content = client.beta.files.download(f.id)
