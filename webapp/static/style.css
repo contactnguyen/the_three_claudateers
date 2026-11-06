@@ -127,3 +127,4 @@ button.primary:disabled { background: var(--lgray); color: var(--mid); border-co
 .spec h3 { font: 700 12pt var(--head); margin: 0 0 6px; }
 .spec pre { white-space: pre-wrap; font: 400 10pt/1.5 var(--body); margin: 0; }
 .footer { border-top: 1px solid var(--mid); margin-top: 48px; padding-top: 10px; font-style: italic; font-size: 9pt; color: var(--mid); }
+[hidden] { display: none !important; }
